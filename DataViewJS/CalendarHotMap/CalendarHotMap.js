@@ -4,6 +4,9 @@ container.innerHTML = "";
 // --- Configuration ---
 const CONFIG = {
     dailyNotesPath: '"Calendar Notes/Daily Notes"', // Target your Daily Notes folder
+    weeklyNotesPath: '"Calendar Notes/Weekly Notes"',
+    monthlyNotesPath: '"Calendar Notes/Monthly Notes"',
+    annualNotesPath: '"Calendar Notes/Annual Notes"',
     kbPath: '"Notes/Knowledge Base"', // Target your Knowledge Base folder; set to null to exclude Daily Notes
     cellBoxSize: 26, // Increased from 22 for better readability
     cellGap: 2,      // Reduced gap between cells
@@ -169,7 +172,7 @@ if (!document.getElementById(cssId)) {
 
         .chm-month-grid {
             display: grid;
-            grid-template-columns: 28px repeat(7, ${CONFIG.cellBoxSize}px);
+            grid-template-columns: 32px repeat(7, ${CONFIG.cellBoxSize}px);
             grid-template-rows: auto repeat(6, ${CONFIG.cellBoxSize}px); 
             gap: ${CONFIG.cellGap}px;
         }
@@ -185,6 +188,7 @@ if (!document.getElementById(cssId)) {
             color: rgba(255,255,255,0.3);
             font-weight: 700;
             user-select: none;
+            box-sizing: border-box;
         }
 
         .chm-cell.active { color: #fff; cursor: pointer; }
@@ -205,9 +209,10 @@ if (!document.getElementById(cssId)) {
             color: #414868;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
-            padding-right: 6px;
+            justify-content: center;
             font-weight: 700;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .chm-tooltip {
@@ -263,41 +268,101 @@ if (!document.getElementById(cssId)) {
         }
         .chm-selection-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
         .chm-selection-item:last-child { margin-bottom: 0; }
+
+        .chm-has-note {
+            background-color: var(--chm-note-bg) !important;
+            color: #fff !important;
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--chm-note-shadow);
+            border-radius: 4px;
+            padding: 2px 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: max-content;
+            transition: transform 0.2s;
+            box-sizing: border-box;
+        }
+        .chm-has-note:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            filter: brightness(1.2);
+        }
     `;
     document.head.appendChild(style);
 }
 
 // --- Data Logic ---
 function getData(year, mode) {
-    let pages;
-    let path = "";
-    if (mode === 'daily') {
-        path = CONFIG.dailyNotesPath;
-    } else {
-        path = CONFIG.kbPath ? CONFIG.kbPath : `-"${CONFIG.dailyNotesPath.replace(/"/g, '')}"`;
-    }
-    try { pages = dv.pages(path); } catch (e) { return {}; }
-    let data = {};
-    const parseDate = (input) => {
-        if (!input) return null;
-        if (moment.isMoment(input)) return input;
-        if (input.toJSDate) return moment(input.toJSDate()); 
-        if (input instanceof Date) return moment(input);
-        return moment(input); 
+    let result = { daily: {}, weekly: {}, monthly: {}, annual: null };
+    
+    // Helper to parse dates safely
+    const toMoment = (date) => {
+        if (!date) return null;
+        if (moment.isMoment(date)) return date;
+        if (date.toJSDate) return moment(date.toJSDate()); // Handle Luxon/Dataview
+        return moment(date);
     };
-    pages.forEach(p => {
-        let d = null;
-        if (p.created) d = parseDate(p.created);
-        else if (p.date) d = parseDate(p.date);
-        else if (mode === 'daily') d = moment(p.file.name, "YYYY-MM-DD", true);
-        else if (p.file.cday) d = moment(p.file.cday);
-        if (d && d.isValid() && d.year() === year) {
-            const key = d.format("YYYY-MM-DD");
-            if (!data[key]) data[key] = [];
-            data[key].push({ file: p.file.path, title: p.file.name, date: key });
+
+    // Helper to process pages
+    const processPages = (path, format, targetObj, keyFn) => {
+        let pages;
+        try { pages = dv.pages(path); } catch (e) { return; }
+        pages.forEach(p => {
+            const d = moment(p.file.name, format, true);
+            if (d.isValid() && d.year() === year) {
+                const key = keyFn(d);
+                if (key !== null) targetObj[key] = p.file.path;
+            }
+        });
+    };
+
+    if (mode === 'daily') {
+        // Daily Notes
+        let pages;
+        try { pages = dv.pages(CONFIG.dailyNotesPath); } catch (e) {}
+        if (pages) {
+            pages.forEach(p => {
+                let d = moment(p.file.name, "YYYY-MM-DD", true);
+                if (!d.isValid() && p.date) d = toMoment(p.date);
+                
+                if (d && d.isValid() && d.year() === year) {
+                    const key = d.format("YYYY-MM-DD");
+                    if (!result.daily[key]) result.daily[key] = [];
+                    result.daily[key].push({ file: p.file.path, title: p.file.name, date: key });
+                }
+            });
         }
-    });
-    return data;
+
+        // Weekly Notes (Key: Week Number)
+        processPages(CONFIG.weeklyNotesPath, ["YYYY-[W]WW", "gggg-[W]ww"], result.weekly, d => d.week());
+
+        // Monthly Notes (Key: Month Index 0-11)
+        processPages(CONFIG.monthlyNotesPath, "YYYY-MM", result.monthly, d => d.month());
+
+        // Annual Note
+        try { 
+            const annualPages = dv.pages(CONFIG.annualNotesPath);
+            annualPages.forEach(p => {
+                if (p.file.name === String(year)) result.annual = p.file.path;
+            });
+        } catch (e) {}
+
+    } else {
+        // Knowledge Base
+        let path = CONFIG.kbPath ? CONFIG.kbPath : `-"${CONFIG.dailyNotesPath.replace(/"/g, '')}"`;
+        let pages;
+        try { pages = dv.pages(path); } catch (e) { return result; }
+        pages.forEach(p => {
+            let d = p.created ? toMoment(p.created) : (p.date ? toMoment(p.date) : toMoment(p.file.cday));
+            if (d && d.isValid() && d.year() === year) {
+                const key = d.format("YYYY-MM-DD");
+                if (!result.daily[key]) result.daily[key] = [];
+                result.daily[key].push({ file: p.file.path, title: p.file.name, date: key });
+            }
+        });
+    }
+    return result;
 }
 
 // --- Rendering ---
@@ -306,7 +371,7 @@ function render() {
     container.innerHTML = "";
     const wrapper = document.createElement("div");
     wrapper.className = "chm-wrapper";
-    wrapper.style.minHeight = isMobile ? "auto" : "auto"; // Auto height for quarterly view
+    wrapper.style.minHeight = isMobile ? "auto" : "auto"; 
     container.appendChild(wrapper);
 
     const header = document.createElement("div");
@@ -321,23 +386,49 @@ function render() {
         btn.onclick = () => { state.mode = id; localStorage.setItem("chm-active-mode", id); render(); };
         return btn;
     };
-    modeSwitch.appendChild(createBtn('daily', '📅 Daily Notes'));
+    modeSwitch.appendChild(createBtn('daily', '📅 Calendar Notes')); 
     modeSwitch.appendChild(createBtn('kb', '🧠 Knowledge Base'));
 
     const navGroup = document.createElement("div");
     navGroup.className = "chm-title-group";
-    const addControls = (label, currentVal, onPrev, onNext) => {
+    
+    // Data Fetching
+    const allData = getData(state.year, state.mode);
+    const dailyData = allData.daily;
+    const colors = state.mode === 'daily' ? STYLES.dailyColors : STYLES.kbColors;
+
+    // Set Dynamic Theme Colors
+    const primaryNoteColor = colors[2]; // Use index 2 as the baseline "Note Exists" color
+    wrapper.style.setProperty('--chm-note-bg', primaryNoteColor);
+    wrapper.style.setProperty('--chm-note-shadow', primaryNoteColor + "40");
+
+    const addControls = (label, currentVal, onPrev, onNext, notePath = null) => {
         const prevBtn = document.createElement("button");
         prevBtn.className = "chm-nav-btn";
         prevBtn.innerHTML = "‹";
         prevBtn.onclick = onPrev;
+        
         const display = document.createElement("div");
         display.className = label === 'year' ? "chm-year-display" : "chm-month-display";
         display.textContent = currentVal;
+        
+        // Annual Note Highlighting & Tooltip
+        if (notePath) {
+            display.classList.add("chm-has-note");
+            display.onclick = (e) => { 
+                e.stopPropagation(); 
+                hideTooltip(); 
+                app.workspace.openLinkText(notePath, "/", false); 
+            };
+            display.onmouseenter = (e) => showTooltip(e, notePath, "Annual Note: " + currentVal);
+            display.onmouseleave = hideTooltip;
+        }
+
         const nextBtn = document.createElement("button");
         nextBtn.className = "chm-nav-btn";
         nextBtn.innerHTML = "›";
         nextBtn.onclick = onNext;
+        
         navGroup.appendChild(prevBtn);
         navGroup.appendChild(display);
         navGroup.appendChild(nextBtn);
@@ -346,7 +437,8 @@ function render() {
     // Year Control
     addControls('year', state.year, 
         () => { state.year--; render(); }, 
-        () => { state.year++; render(); }
+        () => { state.year++; render(); },
+        allData.annual
     );
 
     // Quarter Control
@@ -384,16 +476,13 @@ function render() {
     subHeader.style.fontSize = "1.3rem";
     subHeader.style.fontWeight = "bold";
     subHeader.style.color = state.mode === 'daily' ? "#34d399" : "#60a5fa";
-    subHeader.textContent = state.mode === 'daily' ? "Daily Notes Heatmap" : "Knowledge Base Heatmap";
+    subHeader.textContent = state.mode === 'daily' ? "Calendar Notes Heatmap" : "Knowledge Base Heatmap"; 
     wrapper.appendChild(subHeader);
 
     const mainGrid = document.createElement("div");
     mainGrid.className = "chm-main-grid";
     if (isMobile) mainGrid.style.gridTemplateColumns = "1fr";
 
-    const data = getData(state.year, state.mode);
-    const colors = state.mode === 'daily' ? STYLES.dailyColors : STYLES.kbColors;
-    
     // Calculate months for the current quarter
     const qStart = (state.quarter - 1) * 3;
     const monthsToRender = isMobile ? [state.month] : [qStart, qStart + 1, qStart + 2];
@@ -401,16 +490,30 @@ function render() {
     monthsToRender.forEach(m => {
         const monthCard = document.createElement("div");
         monthCard.className = "chm-month-card";
+        
         const title = document.createElement("div");
         title.className = "chm-month-title";
         title.textContent = moment().month(m).format("MMMM");
+        
+        // Monthly Note Highlighting & Tooltip
+        if (allData.monthly && allData.monthly[m]) {
+            title.classList.add("chm-has-note");
+            title.onclick = (e) => { 
+                e.stopPropagation(); 
+                hideTooltip(); 
+                app.workspace.openLinkText(allData.monthly[m], "/", false); 
+            };
+            title.onmouseenter = (e) => showTooltip(e, allData.monthly[m], "Monthly Note: " + title.textContent);
+            title.onmouseleave = hideTooltip;
+        }
+
         monthCard.appendChild(title);
-        monthCard.appendChild(createMonth(state.year, m, data, colors));
+        monthCard.appendChild(createMonth(state.year, m, allData, colors));
         mainGrid.appendChild(monthCard);
     });
     wrapper.appendChild(mainGrid);
     
-    const totalEntries = Object.values(data).reduce((acc, curr) => acc + curr.length, 0);
+    const totalEntries = Object.values(dailyData).reduce((acc, curr) => acc + curr.length, 0);
     const footer = document.createElement("div");
     footer.style.textAlign = "center";
     footer.style.marginTop = "25px";
@@ -421,26 +524,34 @@ function render() {
 
     const legend = document.createElement("div");
     legend.className = "chm-legend";
+    
+    const createLegendItem = (color, label, isHighlight = false) => {
+        const item = document.createElement("div");
+        item.className = "chm-legend-item";
+        const box = document.createElement("div");
+        box.className = isHighlight ? "chm-has-note" : "chm-legend-box";
+        if (!isHighlight) box.style.background = color;
+        else {
+            box.style.padding = "2px 8px";
+            box.style.fontSize = "10px";
+            box.textContent = "NOTE";
+        }
+        item.appendChild(box);
+        const text = document.createElement("span");
+        text.textContent = label;
+        item.appendChild(text);
+        return item;
+    };
+
     if (state.mode === 'daily') {
-        const createLegendItem = (color, label) => {
-            const item = document.createElement("div");
-            item.className = "chm-legend-item";
-            const box = document.createElement("div");
-            box.className = "chm-legend-box";
-            box.style.background = color;
-            item.appendChild(box);
-            const text = document.createElement("span");
-            text.textContent = label;
-            item.appendChild(text);
-            return item;
-        };
-        legend.appendChild(createLegendItem(STYLES.dailyColors[0], "No Note"));
-        legend.appendChild(createLegendItem(STYLES.dailyColors[4], "Note Created"));
+        legend.appendChild(createLegendItem(colors[0], "Empty"));
+        legend.appendChild(createLegendItem(colors[1], "Daily Heatmap"));
+        legend.appendChild(createLegendItem(null, "W/M/Y Note", true));
     } else {
         const labelLess = document.createElement("span");
         labelLess.textContent = "Less";
         legend.appendChild(labelLess);
-        STYLES.kbColors.forEach(c => {
+        colors.forEach(c => {
             const box = document.createElement("div");
             box.className = "chm-legend-box";
             box.style.background = c;
@@ -456,7 +567,10 @@ function render() {
     initSelectionMenu();
 }
 
-function createMonth(year, month, data, colors) {
+function createMonth(year, month, allData, colors) {
+    const dailyData = allData.daily;
+    const weeklyData = allData.weekly;
+
     const start = moment({year, month, day: 1});
     const daysInMonth = start.daysInMonth();
     const startDay = start.day(); 
@@ -476,6 +590,18 @@ function createMonth(year, month, data, colors) {
         if (!empty && date) {
             const w = date.week();
             wk.textContent = "W" + (w < 10 ? "0" + w : w);
+            
+            // Weekly Note Highlighting & Tooltip
+            if (weeklyData && weeklyData[w]) {
+                wk.classList.add("chm-has-note");
+                wk.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    hideTooltip(); 
+                    app.workspace.openLinkText(weeklyData[w], "/", false); 
+                };
+                wk.onmouseenter = (e) => showTooltip(e, weeklyData[w], "Weekly Note: Week " + w);
+                wk.onmouseleave = hideTooltip;
+            }
         }
         grid.appendChild(wk);
     };
@@ -486,7 +612,7 @@ function createMonth(year, month, data, colors) {
     for(let d=1; d<=daysInMonth; d++) {
         const date = moment({year, month, day: d});
         const dateStr = date.format("YYYY-MM-DD");
-        const entries = data[dateStr] || [];
+        const entries = dailyData[dateStr] || [];
         const count = entries.length;
         const cell = document.createElement("div");
         cell.className = "chm-cell";
@@ -494,7 +620,7 @@ function createMonth(year, month, data, colors) {
         if (count > 0) {
             cell.classList.add("active");
             cell.style.backgroundColor = colors[Math.min(count, colors.length - 1)];
-            cell.onmouseenter = (e) => showTooltip(e, entries, dateStr);
+            cell.onmouseenter = (e) => showTooltip(e, entries, moment(dateStr).format("MMM D, YYYY"));
             cell.onmouseleave = hideTooltip;
             cell.onclick = (e) => {
                 e.stopPropagation();
@@ -534,11 +660,21 @@ function initSelectionMenu() {
     }
 }
 
-function showTooltip(e, entries, dateStr) {
+function showTooltip(e, entries, title) {
     const t = document.getElementById("chm-tooltip");
     if(!t) return;
-    t.innerHTML = `<div style="font-weight:800; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; color:${STYLES.accent}">${moment(dateStr).format("MMM D, YYYY")}</div>` +
+    
+    let content = "";
+    if (Array.isArray(entries)) {
+        // Daily Notes List
+        content = `<div style="font-weight:800; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; color:${STYLES.accent}">${title}</div>` +
                   entries.slice(0, 8).map(x => `<div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px;">• ${x.title}</div>`).join("");
+    } else {
+        // Single Note (Weekly/Monthly/Annual)
+        content = `<div style="font-weight:800; color:${STYLES.accent}">${title}</div>`;
+    }
+
+    t.innerHTML = content;
     t.style.display = "block";
     const rect = e.target.getBoundingClientRect();
     let top = rect.top - t.offsetHeight - 10;
