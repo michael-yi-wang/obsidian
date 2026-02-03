@@ -1,86 +1,74 @@
 # Calendar Heatmap for Obsidian
 
-This `CalendarHotMap.js` script is an Obsidian DataViewJS visualization that renders a **GitHub-style yearly heatmap** of your notes. It helps you track your daily note-taking activity, habits, or journal entries in a clean, interactive calendar view.
+This `CalendarHotMap.js` script is an advanced Obsidian DataViewJS visualization that renders an interactive, GitHub-style heatmap of your note-taking activity. It supports dual modes for tracking Daily Notes and Knowledge Base contributions with a fully responsive design.
 
 ## Features
 
-- **Yearly Overview:** Displays a full year of activity in a structured 4x3 grid (3 months per row).
-- **Heatmap coloring:** Days are colored in shades of green based on the number of notes created that day (darker green = more notes).
-- **Interactive Tooltips:** Hover over any day to see a list of notes created on that date.
-- **Click to Open:** Click on a day to instantly open the first corresponding note.
-- **Responsive Layout:** The calendar centers itself and adapts to the width of your note.
-- **Day Numbers:** Each cell displays the day of the month for easy reading.
+- **Dual View Modes:**
+    - **📅 Daily Notes:** Tracks your daily journal entries (green theme).
+    - **🧠 Knowledge Base:** Tracks note creation across your entire vault or specific folders (blue theme).
+- **Navigation Controls:**
+    - **Yearly/Monthly Toggle:** Navigate between years easily.
+    - **"Today" Button:** Instantly jump back to the current date/year.
+    - **Mobile Optimization:** Automatically switches to a clean single-month view on mobile devices with dedicated month selectors.
+- **Smart Interaction:**
+    - **Interactive Tooltips:** Hover over any day to see a preview list of notes.
+    - **Selection Menu:** If multiple notes exist on the same day, a menu appears allowing you to choose which one to open.
+    - **State Persistence:** Remembers your last selected mode (Daily vs. KB) even after you close Obsidian or navigate away.
+- **Visual Polish:**
+    - **Adaptive Legend:** Shows activity levels dynamically based on the current mode.
+    - **High Readability:** Optimized font sizes and cell spacing for both desktop and mobile.
+    - **Stable Layout:** Fixed-frame design on desktop prevents UI "jumping" when switching years.
 
 ## Prerequisites
 
-To use this script, you need:
-
-1. **Obsidian** (The note-taking app).
+1. **Obsidian** installed.
 2. **Dataview Plugin** installed and enabled.
-3. **Frontmatter in your notes:** The script primarily looks for a `created` property in your note's frontmatter (YAML header).
-
-### Example Frontmatter
-
-Your notes should have a header like this:
-
-```yaml
----
-created: 2026-01-29
-tags: [journal, daily]
----
-```
-
-- **Priority 1:** `created` property (e.g., `2026-01-29`).
-- **Priority 2:** `date` property (fallback if `created` is missing).
-- **Priority 3:** The file name itself, if it is in `YYYY-MM-DD` format (e.g., `2026-01-29.md`).
+3. **Moment.js** (Standard in Obsidian).
 
 ## Installation
 
-1. Copy the code from `CalendarHotMap.js`.
-2. Create a new note in Obsidian (or use an existing one).
-3. Insert a DataviewJS block:
+1. Create a folder in your vault: `DataViewJS/CalendarHotMap/`.
+2. Save the `CalendarHotMap.js` file into that folder.
+3. In any Obsidian note, insert the following block:
 
     ````javascript
     ```dataviewjs
-    // Paste the code here, or use dv.view() to load it from a file
-    dv.view("Path/To/CalendarHotMap")
+    dv.view("DataViewJS/CalendarHotMap")
     ```
     ````
 
+## Configuration
+
+You can customize the script by editing the `CONFIG` object at the top of `CalendarHotMap.js`:
+
+```javascript
+const CONFIG = {
+    // Path to your Daily Notes folder
+    dailyNotesPath: '"Calendar Notes/Daily Notes"', 
+    
+    // Path to your Knowledge Base (set to '' to search all non-daily folders)
+    kbPath: '"Notes/Knowledge Base"', 
+    
+    // Size of the date squares
+    cellBoxSize: 26,
+    
+    // Space between squares
+    cellGap: 2,      
+};
+```
+
+### Date Detection Priority
+The script detects the date of a note in the following order:
+1. `created` property in Frontmatter.
+2. `date` property in Frontmatter.
+3. File name (if formatted as `YYYY-MM-DD`).
+4. File creation date (cday) as a fallback.
+
 ## Customization
 
-You can configure the script by editing the constants at the top of the file:
+### Themes
+You can modify the `STYLES` object to change the background, text, or accent colors. The `dailyColors` and `kbColors` arrays control the 5-level intensity gradient for each mode.
 
-### 1. Target Folder
-
-By default, the script searches for notes in the `"Notes"` folder. To change this to your specific folder (e.g., "Daily Notes" or "Journal"), update this line:
-
-```javascript
-// Change "Notes" to your desired folder path
-const DAILY_NOTES_FOLDER = '"My Daily Journal"';
-
-// Or set it to "" to search your entire vault
-const DAILY_NOTES_FOLDER = "";
-```
-
-### 2. Cell Size
-
-To change the size of the day squares:
-
-```javascript
-const YEAR_CELL_SIZE = "20px"; // Increase or decrease as needed
-```
-
-### 3. Colors
-
-You can modify the `COLORS` array to change the heatmap theme (e.g., to blue or purple shades):
-
-```javascript
-const COLORS = [
-  "#2a2a2a", // 0 entries (Empty)
-  "#0e4429", // Level 1
-  "#006d32", // Level 2
-  "#26a641", // Level 3
-  "#39d353"  // Level 4+
-];
-```
+### Persistent Settings
+The script uses `localStorage` to save your `mode` selection. To reset it, simply switch modes using the UI buttons, and it will remember that state for your next session.
