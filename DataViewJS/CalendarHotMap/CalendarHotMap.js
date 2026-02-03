@@ -13,6 +13,7 @@ const CONFIG = {
 const savedMode = localStorage.getItem("chm-active-mode") || "daily";
 let state = {
     year: moment().year(),
+    quarter: moment().quarter(),
     month: moment().month(), 
     mode: savedMode 
 };
@@ -49,12 +50,11 @@ if (!document.getElementById(cssId)) {
         }
         
         .chm-header {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
             align-items: center;
             margin-bottom: 20px;
             gap: 16px;
-            flex-wrap: wrap;
         }
 
         .chm-title-group {
@@ -63,6 +63,7 @@ if (!document.getElementById(cssId)) {
             gap: 6px;
             flex-wrap: nowrap;
             justify-content: center;
+            grid-column: 2;
         }
 
         .chm-mode-switch {
@@ -71,6 +72,21 @@ if (!document.getElementById(cssId)) {
             padding: 4px;
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.05);
+            grid-column: 1;
+            justify-self: start;
+        }
+
+        @media (max-width: 600px) {
+            .chm-header {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            .chm-mode-switch {
+                justify-self: center;
+                width: 100%;
+                justify-content: center;
+            }
         }
         
         .chm-btn {
@@ -290,7 +306,7 @@ function render() {
     container.innerHTML = "";
     const wrapper = document.createElement("div");
     wrapper.className = "chm-wrapper";
-    wrapper.style.minHeight = isMobile ? "auto" : "960px";
+    wrapper.style.minHeight = isMobile ? "auto" : "auto"; // Auto height for quarterly view
     container.appendChild(wrapper);
 
     const header = document.createElement("div");
@@ -327,17 +343,35 @@ function render() {
         navGroup.appendChild(nextBtn);
     };
 
-    addControls('year', state.year, () => { state.year--; render(); }, () => { state.year++; render(); });
-    if (isMobile) {
-        addControls('month', moment().month(state.month).format("MMM"), 
-            () => { state.month--; if (state.month < 0) { state.month = 11; state.year--; } render(); }, 
-            () => { state.month++; if (state.month > 11) { state.month = 0; state.year++; } render(); }
-        );
-    }
+    // Year Control
+    addControls('year', state.year, 
+        () => { state.year--; render(); }, 
+        () => { state.year++; render(); }
+    );
+
+    // Quarter Control
+    addControls('month', "Q" + state.quarter, 
+        () => { 
+            state.quarter--; 
+            if (state.quarter < 1) { state.quarter = 4; state.year--; }
+            render(); 
+        }, 
+        () => { 
+            state.quarter++; 
+            if (state.quarter > 4) { state.quarter = 1; state.year++; }
+            render(); 
+        }
+    );
+
     const todayBtn = document.createElement("button");
     todayBtn.className = "chm-nav-btn chm-today-btn";
     todayBtn.innerHTML = "Today";
-    todayBtn.onclick = () => { state.year = moment().year(); state.month = moment().month(); render(); };
+    todayBtn.onclick = () => { 
+        state.year = moment().year(); 
+        state.quarter = moment().quarter(); 
+        state.month = moment().month(); 
+        render(); 
+    };
     navGroup.appendChild(todayBtn);
 
     header.appendChild(modeSwitch);
@@ -359,7 +393,10 @@ function render() {
 
     const data = getData(state.year, state.mode);
     const colors = state.mode === 'daily' ? STYLES.dailyColors : STYLES.kbColors;
-    const monthsToRender = isMobile ? [state.month] : [0,1,2,3,4,5,6,7,8,9,10,11];
+    
+    // Calculate months for the current quarter
+    const qStart = (state.quarter - 1) * 3;
+    const monthsToRender = isMobile ? [state.month] : [qStart, qStart + 1, qStart + 2];
 
     monthsToRender.forEach(m => {
         const monthCard = document.createElement("div");
