@@ -434,26 +434,42 @@ function render() {
         navGroup.appendChild(nextBtn);
     };
 
-    // Year Control
-    addControls('year', state.year, 
-        () => { state.year--; render(); }, 
-        () => { state.year++; render(); },
-        allData.annual
-    );
+    // Navigation Logic
+    if (isMobile) {
+        // Mobile: Month-by-Month Navigation
+        addControls('month', moment().month(state.month).format("MMM YYYY"), 
+            () => { 
+                state.month--; 
+                if (state.month < 0) { state.month = 11; state.year--; } 
+                render(); 
+            }, 
+            () => { 
+                state.month++; 
+                if (state.month > 11) { state.month = 0; state.year++; } 
+                render(); 
+            }
+        );
+    } else {
+        // Desktop: Year & Quarter Navigation
+        addControls('year', state.year, 
+            () => { state.year--; render(); }, 
+            () => { state.year++; render(); },
+            allData.annual
+        );
 
-    // Quarter Control
-    addControls('month', "Q" + state.quarter, 
-        () => { 
-            state.quarter--; 
-            if (state.quarter < 1) { state.quarter = 4; state.year--; }
-            render(); 
-        }, 
-        () => { 
-            state.quarter++; 
-            if (state.quarter > 4) { state.quarter = 1; state.year++; }
-            render(); 
-        }
-    );
+        addControls('month', "Q" + state.quarter, 
+            () => { 
+                state.quarter--; 
+                if (state.quarter < 1) { state.quarter = 4; state.year--; }
+                render(); 
+            }, 
+            () => { 
+                state.quarter++; 
+                if (state.quarter > 4) { state.quarter = 1; state.year++; }
+                render(); 
+            }
+        );
+    }
 
     const todayBtn = document.createElement("button");
     todayBtn.className = "chm-nav-btn chm-today-btn";
