@@ -223,10 +223,10 @@ if (!document.getElementById(cssId)) {
 
         .chm-selection-menu {
             position: fixed;
-            background: #1e1e2e;
-            border: 1px solid rgba(255,255,255,0.15);
+            background: #16161e;
+            border: 1px solid #2f354b;
             border-radius: 8px;
-            padding: 8px;
+            padding: 12px;
             z-index: 20000;
             box-shadow: 0 10px 30px rgba(0,0,0,0.6);
             display: none;
@@ -234,7 +234,7 @@ if (!document.getElementById(cssId)) {
             max-width: 350px;
         }
         .chm-selection-item {
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 6px;
             cursor: pointer;
             transition: 0.2s;
@@ -243,8 +243,10 @@ if (!document.getElementById(cssId)) {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            margin-bottom: 2px;
         }
         .chm-selection-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        .chm-selection-item:last-child { margin-bottom: 0; }
     `;
     document.head.appendChild(style);
 }
@@ -459,8 +461,9 @@ function createMonth(year, month, data, colors) {
             cell.onmouseleave = hideTooltip;
             cell.onclick = (e) => {
                 e.stopPropagation();
+                hideTooltip();
                 if (entries.length === 1) app.workspace.openLinkText(entries[0].file, "/", false);
-                else showSelectionMenu(e, entries);
+                else showSelectionMenu(e, entries, dateStr);
             };
         } else cell.style.backgroundColor = colors[0];
         if (dateStr === moment().format("YYYY-MM-DD")) cell.classList.add("today");
@@ -514,10 +517,12 @@ function hideTooltip() {
     if(t) t.style.display = "none";
 }
 
-function showSelectionMenu(e, entries) {
+function showSelectionMenu(e, entries, dateStr) {
     const m = document.getElementById("chm-selection-menu");
     if(!m) return;
-    m.innerHTML = "";
+    hideTooltip();
+    m.innerHTML = `<div style="font-weight:800; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px; color:${STYLES.accent}">${moment(dateStr).format("MMM D, YYYY")}</div>`;
+    
     entries.forEach(entry => {
         const item = document.createElement("div");
         item.className = "chm-selection-item";
