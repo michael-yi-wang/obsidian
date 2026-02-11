@@ -27,8 +27,8 @@ const STYLES = {
     text: "#c0caf5",
     accent: "#7aa2f7",
     
-    dailyColors: ["rgba(255, 255, 255, 0.05)", "#0f4b3e", "#10b981", "#059669", "#34d399"],
-    kbColors: ["rgba(255, 255, 255, 0.05)", "#1e3a8a", "#3b82f6", "#2563eb", "#60a5fa"]
+    dailyColors: ["rgba(255, 255, 255, 0.05)", "#34d399", "#10b981", "#059669", "#064e3b"],
+    kbColors: ["rgba(255, 255, 255, 0.05)", "#7aa2f7", "#3b82f6", "#2563eb", "#1e3a8a"]
 };
 
 // Inject Custom CSS
