@@ -8,10 +8,10 @@ const CONFIG = {
     cellSize: 20,
     cellGap: 4,
     // Blue palette for Daily Notes
-    dailyColors: ["#161b22", "#0a2d4a", "#0d4f87", "#1877c8", "#58a6ff"],
+    dailyColors: ["#161b22", "#1464b4", "#1877c8", "#2d93f5", "#58a6ff"],
     // Green palette for Knowledge Base
-    kbColors:    ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"],
-    thresholds:  [0, 1, 3, 6, 10],
+    kbColors:    ["#161b22", "#1a7a35", "#26a641", "#32cc52", "#39d353"],
+    thresholds:  [0, 1, 2, 4, 7],
 };
 
 // --- State ---
