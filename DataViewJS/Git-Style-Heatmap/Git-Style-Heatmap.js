@@ -4,14 +4,14 @@ container.textContent = "";
 // --- Configuration ---
 const CONFIG = {
     dailyNotesPath: '"Calendar Notes/Daily Notes"',
-    kbPath:         '"Notes/Knowledge Base"',
+    kbPath: '"Notes/Knowledge Base"',
     cellSize: 20,
     cellGap: 4,
-    // Blue palette for Daily Notes
-    dailyColors: ["#161b22", "#0a2d4a", "#0d4f87", "#1877c8", "#58a6ff"],
+    // Blue palette for Daily Notes (binary: empty or has a note)
+    dailyColors: ["#161b22", "#58a6ff"],
     // Green palette for Knowledge Base
-    kbColors:    ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"],
-    thresholds:  [0, 1, 3, 6, 10],
+    kbColors: ["#161b22", "#006d32", "#26a641", "#39d353"],
+    thresholds: [0, 1, 2, 3],
 };
 
 // --- State ---
@@ -308,7 +308,7 @@ function extractDate(p, year) {
             if (moment.isMoment(p.created)) d = p.created.clone();
             else if (typeof p.created.toJSDate === "function") d = moment(p.created.toJSDate());
             else d = moment(p.created);
-        } catch(e) { d = null; }
+        } catch (e) { d = null; }
     }
     // Fall back to file.day (DataView sets this for date-named files like 2025-01-15.md)
     if (!d || !d.isValid()) {
@@ -316,7 +316,7 @@ function extractDate(p, year) {
             if (p.file && p.file.day) {
                 d = moment(p.file.day.toJSDate ? p.file.day.toJSDate() : p.file.day);
             }
-        } catch(e) { d = null; }
+        } catch (e) { d = null; }
     }
     if (!d || !d.isValid() || d.year() !== year) return null;
     return d.format("YYYY-MM-DD");
@@ -336,7 +336,7 @@ function getData(year) {
             ensure(key);
             map[key].daily.push({ file: p.file.path, title: p.file.name });
         });
-    } catch(e) {}
+    } catch (e) { }
 
     try {
         dv.pages(CONFIG.kbPath).forEach(p => {
@@ -345,7 +345,7 @@ function getData(year) {
             ensure(key);
             map[key].kb.push({ file: p.file.path, title: p.file.name });
         });
-    } catch(e) {}
+    } catch (e) { }
 
     return map;
 }
@@ -367,7 +367,7 @@ function getCellBackground(dailyCount, kbCount, inYear) {
         return `linear-gradient(135deg, ${CONFIG.dailyColors[dIdx]} 50%, ${CONFIG.kbColors[kIdx]} 50%)`;
     }
     if (dailyCount > 0) return CONFIG.dailyColors[dIdx];
-    if (kbCount > 0)    return CONFIG.kbColors[kIdx];
+    if (kbCount > 0) return CONFIG.kbColors[kIdx];
     return CONFIG.dailyColors[0]; // empty
 }
 
@@ -380,10 +380,10 @@ function calcStats(data, year) {
         const dateStr = jan1.clone().add(i, "days").format("YYYY-MM-DD");
         const entry = data[dateStr];
         const dc = entry ? entry.daily.length : 0;
-        const kc = entry ? entry.kb.length    : 0;
+        const kc = entry ? entry.kb.length : 0;
         const total = dc + kc;
         totalDaily += dc;
-        totalKB    += kc;
+        totalKB += kc;
         if (total > 0) {
             activeDays++;
             maxDay = Math.max(maxDay, total);
@@ -441,35 +441,35 @@ function render() {
 
     // Grid geometry
     const CELL = CONFIG.cellSize;
-    const GAP  = CONFIG.cellGap;
+    const GAP = CONFIG.cellGap;
     const STEP = CELL + GAP;
     const WEEKDAY_COL_W = 36;
-    const MONTH_ROW_H   = 22;
+    const MONTH_ROW_H = 22;
 
     const year = state.year;
-    const gridStart = moment({ year, month: 0,  day: 1 }).startOf("week");
-    const gridEnd   = moment({ year, month: 11, day: 31 }).endOf("week");
+    const gridStart = moment({ year, month: 0, day: 1 }).startOf("week");
+    const gridEnd = moment({ year, month: 11, day: 31 }).endOf("week");
     const totalWeeks = Math.ceil((gridEnd.diff(gridStart, "days") + 1) / 7);
-    const todayStr  = moment().format("YYYY-MM-DD");
-    const data      = getData(year);
-    const stats     = calcStats(data, year);
+    const todayStr = moment().format("YYYY-MM-DD");
+    const data = getData(year);
+    const stats = calcStats(data, year);
 
     // ── Heatmap ──────────────────────────────────────────────────────────
     const scrollEl = el("div", "gsh-heatmap-scroll");
-    const inner    = el("div", "gsh-heatmap-inner");
+    const inner = el("div", "gsh-heatmap-inner");
 
     // Month labels
-    const monthRowEl    = el("div", "gsh-month-row", { paddingLeft: WEEKDAY_COL_W + "px" });
+    const monthRowEl = el("div", "gsh-month-row", { paddingLeft: WEEKDAY_COL_W + "px" });
     const monthRowInner = el("div", null, {
         position: "relative",
-        height:   MONTH_ROW_H + "px",
-        width:    (totalWeeks * STEP) + "px",
+        height: MONTH_ROW_H + "px",
+        width: (totalWeeks * STEP) + "px",
     });
 
     for (let m = 0; m < 12; m++) {
-        const mStart     = moment({ year, month: m, day: 1 });
+        const mStart = moment({ year, month: m, day: 1 });
         const weekOffset = Math.floor(mStart.diff(gridStart, "days") / 7);
-        const lbl        = txt("div", "gsh-month-label", mStart.format("MMM"), { left: (weekOffset * STEP) + "px" });
+        const lbl = txt("div", "gsh-month-label", mStart.format("MMM"), { left: (weekOffset * STEP) + "px" });
         monthRowInner.appendChild(lbl);
     }
     monthRowEl.appendChild(monthRowInner);
@@ -479,7 +479,7 @@ function render() {
     const cellsRow = el("div", "gsh-cells-row");
 
     const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const SHOW_LABEL    = [false, true, false, true, false, true, false];
+    const SHOW_LABEL = [false, true, false, true, false, true, false];
 
     const weekdayCol = el("div", "gsh-weekday-col", { width: WEEKDAY_COL_W + "px" });
     for (let d = 0; d < 7; d++) {
@@ -497,22 +497,22 @@ function render() {
         const weekCol = el("div", "gsh-week-col", { marginRight: GAP + "px" });
 
         for (let d = 0; d < 7; d++) {
-            const date         = gridStart.clone().add(w * 7 + d, "days");
-            const dateStr      = date.format("YYYY-MM-DD");
-            const inYear       = date.year() === year;
-            const entry        = inYear ? (data[dateStr] || { daily: [], kb: [] }) : { daily: [], kb: [] };
+            const date = gridStart.clone().add(w * 7 + d, "days");
+            const dateStr = date.format("YYYY-MM-DD");
+            const inYear = date.year() === year;
+            const entry = inYear ? (data[dateStr] || { daily: [], kb: [] }) : { daily: [], kb: [] };
             const dailyEntries = entry.daily;
-            const kbEntries    = entry.kb;
-            const dailyCount   = dailyEntries.length;
-            const kbCount      = kbEntries.length;
-            const totalCount   = dailyCount + kbCount;
-            const bg           = getCellBackground(dailyCount, kbCount, inYear);
+            const kbEntries = entry.kb;
+            const dailyCount = dailyEntries.length;
+            const kbCount = kbEntries.length;
+            const totalCount = dailyCount + kbCount;
+            const bg = getCellBackground(dailyCount, kbCount, inYear);
 
             const cellStyle = {
-                width:        CELL + "px",
-                height:       CELL + "px",
-                marginBottom: GAP  + "px",
-                opacity:      inYear ? "1" : "0.18",
+                width: CELL + "px",
+                height: CELL + "px",
+                marginBottom: GAP + "px",
+                opacity: inYear ? "1" : "0.18",
             };
             // linear-gradient must use background, not backgroundColor
             if (bg.startsWith("linear-gradient")) cellStyle.background = bg;
@@ -553,12 +553,12 @@ function render() {
     // ── Stats bar ─────────────────────────────────────────────────────────
     const statsBar = el("div", "gsh-stats");
     const statItems = [
-        { label: "Daily Notes",    value: String(stats.totalDaily),   cls: "gsh-stat-value-daily" },
-        { label: "KB Notes",       value: String(stats.totalKB),       cls: "gsh-stat-value-kb" },
-        { label: "Active Days",    value: String(stats.activeDays),    cls: "gsh-stat-value" },
-        { label: "Longest Streak", value: stats.maxStreak + "d",       cls: "gsh-stat-value" },
-        { label: "Current Streak", value: stats.currentStreak + "d",   cls: "gsh-stat-value" },
-        { label: "Best Day",       value: stats.maxDay > 0 ? stats.maxDay + (stats.maxDay === 1 ? " note" : " notes") : "—", cls: "gsh-stat-value" },
+        { label: "Daily Notes", value: String(stats.totalDaily), cls: "gsh-stat-value-daily" },
+        { label: "KB Notes", value: String(stats.totalKB), cls: "gsh-stat-value-kb" },
+        { label: "Active Days", value: String(stats.activeDays), cls: "gsh-stat-value" },
+        { label: "Longest Streak", value: stats.maxStreak + "d", cls: "gsh-stat-value" },
+        { label: "Current Streak", value: stats.currentStreak + "d", cls: "gsh-stat-value" },
+        { label: "Best Day", value: stats.maxDay > 0 ? stats.maxDay + (stats.maxDay === 1 ? " note" : " notes") : "—", cls: "gsh-stat-value" },
     ];
 
     statItems.forEach(item => {
@@ -579,8 +579,9 @@ function render() {
         colors.forEach((color, i) => {
             const box = el("div", "gsh-legend-box", { backgroundColor: color });
             const tip = i === 0 ? "No notes"
+                : colors.length === 2 ? "Has note"
                 : i === CONFIG.thresholds.length - 1 ? CONFIG.thresholds[i] + "+ notes"
-                : CONFIG.thresholds[i] + "–" + (CONFIG.thresholds[i + 1] - 1) + " notes";
+                    : CONFIG.thresholds[i] + "–" + (CONFIG.thresholds[i + 1] - 1) + " notes";
             box.title = tip;
             row.appendChild(box);
         });
@@ -588,8 +589,8 @@ function render() {
         return row;
     }
 
-    legend.appendChild(makeLegendRow("Daily Notes",    "daily", CONFIG.dailyColors));
-    legend.appendChild(makeLegendRow("Knowledge Base", "kb",    CONFIG.kbColors));
+    legend.appendChild(makeLegendRow("Daily Notes", "daily", CONFIG.dailyColors));
+    legend.appendChild(makeLegendRow("Knowledge Base", "kb", CONFIG.kbColors));
     wrapper.appendChild(legend);
 
     initTooltip();
@@ -644,12 +645,12 @@ function showTooltip(e, dailyEntries, kbEntries, dateLabel) {
 
     t.style.display = "block";
     const rect = e.target.getBoundingClientRect();
-    let top  = rect.top - t.offsetHeight - 10;
+    let top = rect.top - t.offsetHeight - 10;
     let left = rect.left - (t.offsetWidth / 2) + (rect.width / 2);
-    if (top < 10)  top  = rect.bottom + 10;
+    if (top < 10) top = rect.bottom + 10;
     if (left < 10) left = 10;
     if (left + t.offsetWidth > window.innerWidth - 10) left = window.innerWidth - t.offsetWidth - 10;
-    t.style.top  = top  + "px";
+    t.style.top = top + "px";
     t.style.left = left + "px";
 }
 
@@ -704,11 +705,11 @@ function showSelectionMenu(e, dailyEntries, kbEntries, dateLabel) {
 
     m.style.display = "block";
     const rect = e.target.getBoundingClientRect();
-    let top  = rect.bottom + 5;
+    let top = rect.bottom + 5;
     let left = rect.left;
-    if (top  + m.offsetHeight > window.innerHeight)     top  = rect.top - m.offsetHeight - 5;
-    if (left + m.offsetWidth  > window.innerWidth - 10) left = window.innerWidth - m.offsetWidth - 10;
-    m.style.top  = top  + "px";
+    if (top + m.offsetHeight > window.innerHeight) top = rect.top - m.offsetHeight - 5;
+    if (left + m.offsetWidth > window.innerWidth - 10) left = window.innerWidth - m.offsetWidth - 10;
+    m.style.top = top + "px";
     m.style.left = left + "px";
 
     const closeHandler = (evt) => {
