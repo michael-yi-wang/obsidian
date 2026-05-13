@@ -7,8 +7,8 @@ const CONFIG = {
     kbPath: '"Notes/Knowledge Base"',
     cellSize: 20,
     cellGap: 4,
-    // Blue palette for Daily Notes
-    dailyColors: ["#161b22", "#0d4f87", "#1877c8", "#58a6ff"],
+    // Blue palette for Daily Notes (binary: empty or has a note)
+    dailyColors: ["#161b22", "#58a6ff"],
     // Green palette for Knowledge Base
     kbColors: ["#161b22", "#006d32", "#26a641", "#39d353"],
     thresholds: [0, 1, 2, 3],
@@ -579,6 +579,7 @@ function render() {
         colors.forEach((color, i) => {
             const box = el("div", "gsh-legend-box", { backgroundColor: color });
             const tip = i === 0 ? "No notes"
+                : colors.length === 2 ? "Has note"
                 : i === CONFIG.thresholds.length - 1 ? CONFIG.thresholds[i] + "+ notes"
                     : CONFIG.thresholds[i] + "–" + (CONFIG.thresholds[i + 1] - 1) + " notes";
             box.title = tip;
