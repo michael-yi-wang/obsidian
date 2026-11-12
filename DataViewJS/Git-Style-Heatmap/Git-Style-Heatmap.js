@@ -5,8 +5,10 @@ container.textContent = "";
 const CONFIG = {
     dailyNotesPath: '"Calendar Notes/Daily Notes"',
     kbPath: '"Notes/Knowledge Base"',
-    cellSize: 20,
-    cellGap: 4,
+    // Day cells are fluid: the 53-week grid stretches to fill the pane width.
+    minCellSize: 8,     // px; below this the grid scrolls instead of shrinking further
+    maxCellSize: null,  // px or null; set e.g. 28 to stop cells growing on very wide windows
+    cellGap: 4,         // px; max gap between cells (shrinks on narrow panes)
     // Blue palette for Daily Notes (binary: empty or has a note)
     dailyColors: ["#161b22", "#58a6ff"],
     // Green palette for Knowledge Base
@@ -96,46 +98,44 @@ styleEl.textContent = `
         transition: background 0.2s, color 0.2s;
     }
     .gsh-today-btn:hover { background: #30363d; color: #e6edf3; }
+    /* Size container: the grid below sizes itself from the actual pane width
+       and reflows live when the Obsidian window is resized. */
     .gsh-heatmap-scroll {
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 4px;
-        text-align: center;
+        container-type: inline-size;
+        width: 100%;
+        overflow-x: auto;   /* only kicks in below CONFIG.minCellSize */
+        overflow-y: visible;
+        padding: 4px 0;
     }
-    .gsh-heatmap-inner {
-        display: inline-flex;
-        flex-direction: column;
-        text-align: left;
+    .gsh-grid {
+        display: grid;
+        width: 100%;
+        margin: 0 auto;
+        gap: clamp(1px, 0.3cqi, ${CONFIG.cellGap}px);
+        align-items: center;
     }
-    .gsh-month-row { display: flex; }
     .gsh-month-label {
-        font-size: 11px;
+        grid-row: 1;
+        font-size: clamp(11px, 0.9cqi, 15px);
         color: #8b949e;
         font-weight: 600;
-        position: absolute;
-        top: 2px;
-    }
-    .gsh-cells-row {
-        display: flex;
-        flex-direction: row;
-    }
-    .gsh-weekday-col {
-        display: flex;
-        flex-direction: column;
-        margin-right: 8px;
+        white-space: nowrap;
+        padding-bottom: 4px;
+        align-self: end;
     }
     .gsh-weekday-label {
-        font-size: 11px;
+        grid-column: 1;
+        font-size: clamp(11px, 0.9cqi, 15px);
         color: #8b949e;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        padding-right: 4px;
+        text-align: right;
+        padding-right: 8px;
+        white-space: nowrap;
     }
-    .gsh-weeks { display: flex; flex-direction: row; }
-    .gsh-week-col { display: flex; flex-direction: column; }
     .gsh-cell {
-        border-radius: 3px;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        min-width: 0;
+        border-radius: clamp(2px, 0.25cqi, 5px);
         box-sizing: border-box;
         transition: transform 0.1s, filter 0.1s;
     }
@@ -440,11 +440,8 @@ function render() {
     wrapper.appendChild(header);
 
     // Grid geometry
-    const CELL = CONFIG.cellSize;
     const GAP = CONFIG.cellGap;
-    const STEP = CELL + GAP;
-    const WEEKDAY_COL_W = 36;
-    const MONTH_ROW_H = 22;
+    const WEEKDAY_COL_W = 44;
 
     const year = state.year;
     const gridStart = moment({ year, month: 0, day: 1 }).startOf("week");
@@ -455,47 +452,40 @@ function render() {
     const stats = calcStats(data, year);
 
     // ── Heatmap ──────────────────────────────────────────────────────────
+    // One CSS grid: column 1 = weekday labels, columns 2..N+1 = weeks (equal 1fr
+    // shares of the pane width); row 1 = month labels, rows 2..8 = Sun..Sat.
     const scrollEl = el("div", "gsh-heatmap-scroll");
-    const inner = el("div", "gsh-heatmap-inner");
+    const gridStyles = {
+        gridTemplateColumns: `${WEEKDAY_COL_W}px repeat(${totalWeeks}, minmax(${CONFIG.minCellSize}px, 1fr))`,
+        gridTemplateRows: "auto",
+        minWidth: (WEEKDAY_COL_W + totalWeeks * (CONFIG.minCellSize + 1)) + "px",
+    };
+    if (CONFIG.maxCellSize) {
+        gridStyles.maxWidth = (WEEKDAY_COL_W + totalWeeks * (CONFIG.maxCellSize + GAP)) + "px";
+    }
+    const grid = el("div", "gsh-grid", gridStyles);
 
-    // Month labels
-    const monthRowEl = el("div", "gsh-month-row", { paddingLeft: WEEKDAY_COL_W + "px" });
-    const monthRowInner = el("div", null, {
-        position: "relative",
-        height: MONTH_ROW_H + "px",
-        width: (totalWeeks * STEP) + "px",
-    });
-
+    // Month labels (span a few week columns so the text has room)
     for (let m = 0; m < 12; m++) {
         const mStart = moment({ year, month: m, day: 1 });
         const weekOffset = Math.floor(mStart.diff(gridStart, "days") / 7);
-        const lbl = txt("div", "gsh-month-label", mStart.format("MMM"), { left: (weekOffset * STEP) + "px" });
-        monthRowInner.appendChild(lbl);
+        grid.appendChild(txt("div", "gsh-month-label", mStart.format("MMM"), {
+            gridColumn: `${weekOffset + 2} / span 3`,
+        }));
     }
-    monthRowEl.appendChild(monthRowInner);
-    inner.appendChild(monthRowEl);
 
-    // Weekday labels + week columns
-    const cellsRow = el("div", "gsh-cells-row");
-
+    // Weekday labels
     const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const SHOW_LABEL = [false, true, false, true, false, true, false];
-
-    const weekdayCol = el("div", "gsh-weekday-col", { width: WEEKDAY_COL_W + "px" });
     for (let d = 0; d < 7; d++) {
-        const lbl = txt("div", "gsh-weekday-label",
+        grid.appendChild(txt("div", "gsh-weekday-label",
             SHOW_LABEL[d] ? WEEKDAY_NAMES[d] : "",
-            { height: STEP + "px", lineHeight: CELL + "px" }
-        );
-        weekdayCol.appendChild(lbl);
+            { gridRow: String(d + 2) }
+        ));
     }
-    cellsRow.appendChild(weekdayCol);
 
-    const weeksEl = el("div", "gsh-weeks");
-
+    // Day cells
     for (let w = 0; w < totalWeeks; w++) {
-        const weekCol = el("div", "gsh-week-col", { marginRight: GAP + "px" });
-
         for (let d = 0; d < 7; d++) {
             const date = gridStart.clone().add(w * 7 + d, "days");
             const dateStr = date.format("YYYY-MM-DD");
@@ -509,9 +499,8 @@ function render() {
             const bg = getCellBackground(dailyCount, kbCount, inYear);
 
             const cellStyle = {
-                width: CELL + "px",
-                height: CELL + "px",
-                marginBottom: GAP + "px",
+                gridColumn: String(w + 2),
+                gridRow: String(d + 2),
                 opacity: inYear ? "1" : "0.18",
             };
             // linear-gradient must use background, not backgroundColor
@@ -540,14 +529,11 @@ function render() {
                 }
             }
 
-            weekCol.appendChild(cell);
+            grid.appendChild(cell);
         }
-        weeksEl.appendChild(weekCol);
     }
 
-    cellsRow.appendChild(weeksEl);
-    inner.appendChild(cellsRow);
-    scrollEl.appendChild(inner);
+    scrollEl.appendChild(grid);
     wrapper.appendChild(scrollEl);
 
     // ── Stats bar ─────────────────────────────────────────────────────────

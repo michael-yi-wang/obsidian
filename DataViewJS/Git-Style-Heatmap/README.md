@@ -11,7 +11,7 @@ A DataviewJS visualization that renders a full-year, GitHub-style contribution h
 - **Hover tooltips** — shows the date, note count, and up to 6 note titles.
 - **Click to open** — single note opens directly; multiple notes on the same day show a selection menu.
 - **Stats bar** — Total Notes, Active Days, Longest Streak, Current Streak, Best Day.
-- **Horizontal scroll** — safe to embed in narrow sidebars or reading panes.
+- **Fills the window width** — day cells scale with the Obsidian pane, reflowing live on window resize with no horizontal scrollbar (it only scrolls if the pane is too narrow for `minCellSize`).
 
 ## Prerequisites
 
@@ -54,8 +54,9 @@ const CONFIG = {
     searchPath: null,
 
     // Visual sizing
-    cellSize: 13,   // px width/height of each day cell
-    cellGap:  3,    // px gap between cells
+    minCellSize: 8,     // px; below this the grid scrolls instead of shrinking
+    maxCellSize: null,  // px or null; cap cell growth on very wide windows
+    cellGap:  4,        // px; max gap between cells
 
     // Colour scale (index 0 = empty, index 4 = most active)
     colors: [
